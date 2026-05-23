@@ -1,5 +1,7 @@
 # vllm-gemma4-31b-fp8
 
+[![English](https://img.shields.io/badge/English-blue?style=flat-square)](README.md) [![한국어](https://img.shields.io/badge/%ED%95%9C%EA%B5%AD%EC%96%B4-lightgrey?style=flat-square)](README.ko.md) [![日本語](https://img.shields.io/badge/%E6%97%A5%E6%9C%AC%E8%AA%9E-lightgrey?style=flat-square)](README.ja.md)
+
 Production-grade vLLM serving stack for Gemma 4 31B on RTX PRO 6000 Blackwell, with FP8 KV cache, MTP speculative decoding, and an async FastAPI logging proxy in front.
 
 ---
@@ -183,3 +185,9 @@ Full procedure in [docs/deployment.md](docs/deployment.md).
 ## Status
 
 Running in production for an internal ~10-user lab; reboot-tested, surviving driver/kernel updates and clean shutdowns.
+
+---
+
+## Notes
+
+AI tools were used to assist with content organization and grammar editing on this page.
