@@ -1,6 +1,6 @@
 # vllm-gemma4-31b-fp8
 
-English · [한국어](README.ko.md)
+**English** · [한국어](README.ko.md)
 
 vLLM serving stack for Gemma 4 31B on RTX PRO 6000 Blackwell, with FP8 KV cache, MTP speculative decoding, and an async FastAPI logging proxy in front.
 
