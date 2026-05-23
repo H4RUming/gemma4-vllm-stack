@@ -1,6 +1,6 @@
 # vllm-gemma4-31b-fp8
 
-[English](README.md) · 한국어
+[English](README.md) · **한국어**
 
 RTX PRO 6000 Blackwell 위에서 Gemma 4 31B를 서빙하기 위한 vLLM 스택. FP8 KV 캐시, MTP 추측 디코딩, 비동기 FastAPI 로깅 프록시까지 한 세트로 묶었다.
 
