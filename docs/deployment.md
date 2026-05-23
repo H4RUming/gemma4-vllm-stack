@@ -127,18 +127,39 @@ The proxy stays light on purpose. If `import torch` ever succeeds in `.venv-prox
 
 ---
 
-## 9. Install systemd units
+## 9. Install systemd units (flat layout on the host)
+
+Two paths get touched:
+- `/etc/systemd/system/` — the `.service` files.
+- `${LLM_OPS_DIR}` (default `/home/haru/Desktop/LLM-OPS`) — the wrapper scripts (`run_vllm.sh`, `run_proxy.sh`) and the proxy clone.
+
+The unit files have absolute paths baked in (`WorkingDirectory=/home/haru/Desktop/LLM-OPS`, `ExecStart=/home/haru/Desktop/LLM-OPS/run_vllm.sh`), so the wrapper scripts must sit at the top level of the working directory — **not** under a `systemd/` subdirectory. The flat layout is intentional; the repo's `systemd/` directory is for organization only.
 
 ```bash
 # 경로 안의 /home/haru/Desktop/LLM-OPS 는 실제 배포 위치에 맞춰 치환할 것.
 sudo cp systemd/vllm-gemma4.service /etc/systemd/system/
 sudo cp systemd/vllm-proxy.service /etc/systemd/system/
+
 chmod +x systemd/run_vllm.sh systemd/run_proxy.sh
 cp systemd/run_vllm.sh systemd/run_proxy.sh ~/Desktop/LLM-OPS/
 
 sudo systemctl daemon-reload
 sudo systemctl enable vllm-gemma4.service vllm-proxy.service
 sudo systemctl start  vllm-gemma4.service   # proxy will follow via Requires=
+```
+
+Resulting layout on the host:
+
+```
+/home/haru/Desktop/LLM-OPS/
+├── run_vllm.sh
+├── run_proxy.sh
+├── proxy/                   ← from git clone (see §8)
+├── .venv/                   ← from §5–§6
+├── .venv-proxy/             ← from §5, §8
+├── .venv-quant/             ← from §5
+├── hf-cache/                ← HF_HOME
+└── logs/                    ← created on first request
 ```
 
 ---
@@ -150,8 +171,8 @@ sudo systemctl start  vllm-gemma4.service   # proxy will follow via Requires=
 1. `Loaded Gemma4MTPModel for speculative decoding`
 2. `Sharing input embedding weights with draft head`
 3. `Loading model weights took ... GiB` (≈ 33 GiB)
-4. `KV cache size: 853,392 tokens` (or close)
-5. `Maximum concurrency for 262,144 tokens per request: 3.26x`
+4. `KV cache size: ~495,400 tokens` (block_size=16 × num_gpu_blocks≈35,447 with the current `--max-num-batched-tokens 32768`; see [ADR-007](adr/007-max-num-batched-tokens-32768.md))
+5. `Maximum concurrency for 262,144 tokens per request: ~1.89x`
 6. `Compiling the model with mode='full_and_piecewise' for FlashInfer SM120`
 7. `Capturing CUDA graphs (decode, mixed prefill-decode)`
 8. `Application startup complete.`

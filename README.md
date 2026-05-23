@@ -13,9 +13,10 @@ Single GPU, 800-token decode, deterministic Korean prompt, 5-run mean.
 | Configuration               | Throughput      | vs baseline | Notes                              |
 | --------------------------- | --------------- | ----------- | ---------------------------------- |
 | Baseline (MTP disabled)     | 42.1 tok/s (σ 0.03) | 1.00x   | reference                          |
-| MTP=5, single request       | 103.2 tok/s (σ ~3)  | **2.45x** | acceptance rate 78%                |
+| MTP=5, single request       | 103.2 tok/s (σ ~3)  | **2.45x** | initial 5-run benchmark            |
 | MTP=5, 3 concurrent (per req) | ~99 tok/s     | 2.35x       | 96% of single — near-linear        |
 | MTP=5, 3 concurrent (aggregate) | **294 tok/s** | **7.0x** | wall time 8.2s vs 7.7s single (+6%) |
+| MTP=5, sustained (live traffic) | 100–125 tok/s | 2.4–3.0x | per-position acceptance 0.99/0.98/0.96/0.94/0.89; avg draft acceptance **94–97%** (re-measured 2026-05-23) |
 
 MTP=4 (model-card recommended) measured at 95–98 tok/s, ~5% below the chosen MTP=5. See [ADR-003](docs/adr/003-mtp-num-spec-tokens-5.md).
 
@@ -23,11 +24,17 @@ MTP=4 (model-card recommended) measured at 95–98 tok/s, ~5% below the chosen M
 
 ## Memory profile
 
-- Model weights: **~33 GB** (BCCard FP8-Dynamic, BF16 + F8_E4M3 mixed)
-- KV cache pool: **853K tokens** (`--kv-cache-dtype fp8`)
+- Model weights: **~33 GB** (BCCard FP8-Dynamic, BF16 + F8_E4M3 mixed); ~89 GB GPU residency including weights + KV pool + CUDA Graphs + draft model
+- KV cache pool: **495,400 tokens** (`--kv-cache-dtype fp8`, `block_size=16`, `num_gpu_blocks=35,447`; measured 2026-05-23, post-`--max-num-batched-tokens` change — see [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md))
 - Max context per request: **262,144** (256K, `--max-model-len`)
-- Guaranteed concurrency at 256K context: **3.26x**
+- Guaranteed concurrency at 256K context: **~1.89x** (`495,400 / 262,144`); pool size is config-dependent and should be re-derived after any flag change
 - Decode ITL improvement vs BF16 KV: ~32% (per vLLM's published Gemma 4 numbers)
+
+Reproduce KV pool on the running service:
+
+```bash
+curl -s http://127.0.0.1:8001/metrics | grep -E 'num_gpu_blocks|kv_cache_memory_bytes'
+```
 
 ---
 
@@ -90,13 +97,16 @@ gemma4-vllm-stack/
 ├── docs/
 │   ├── architecture.md
 │   ├── deployment.md
-│   └── adr/
-│       ├── 001-fp8-kv-over-turboquant.md
-│       ├── 002-vllm-nightly-cu129.md
-│       ├── 003-mtp-num-spec-tokens-5.md
-│       ├── 004-bccard-fp8-over-nvfp4.md
-│       ├── 005-logging-proxy-separation.md
-│       └── 006-llmcompressor-venv-isolation.md
+│   ├── adr/
+│   │   ├── 001-fp8-kv-over-turboquant.md
+│   │   ├── 002-vllm-nightly-cu129.md
+│   │   ├── 003-mtp-num-spec-tokens-5.md
+│   │   ├── 004-bccard-fp8-over-nvfp4.md
+│   │   ├── 005-logging-proxy-separation.md
+│   │   ├── 006-llmcompressor-venv-isolation.md
+│   │   └── 007-max-num-batched-tokens-32768.md
+│   └── investigations/
+│       └── 2026-05-23-prefill-investigation.md
 ├── systemd/
 │   ├── vllm-gemma4.service
 │   ├── vllm-proxy.service
@@ -153,17 +163,41 @@ Full procedure in [docs/deployment.md](docs/deployment.md).
 
 ## Key decisions (TL;DR)
 
-1. **FP8 KV cache, not TurboQuant.** TurboQuant is blocked on Gemma 4 by two independent issues: heterogeneous head dimensions (256 local, 512 global) force the `TRITON_ATTN` backend which doesn't implement `kv_cache_dtype`, and vLLM PR #40534's `use_bidirectional_attention='vision'` propagates `use_mm_prefix=True` on full-attention layers. Standard FP8 e4m3 gives 853K-token pool, 3.26x guaranteed concurrency at 256K, and ~32% decode ITL improvement. See [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md).
+1. **FP8 KV cache, not TurboQuant.** TurboQuant is blocked on Gemma 4 by two independent issues: heterogeneous head dimensions (256 local, 512 global) force the `TRITON_ATTN` backend which doesn't implement `kv_cache_dtype`, and vLLM PR #40534's `use_bidirectional_attention='vision'` propagates `use_mm_prefix=True` on full-attention layers. Standard FP8 e4m3 gives ~32% decode ITL improvement at no measurable accuracy cost. Current pool: 495,400 tokens / ~1.89x at 256K context (driven by the chunk-size choice in [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md)). See [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md).
 
 2. **vLLM nightly cu129, not PyPI stable.** The PyPI wheel links `libcudart.so.13` and the system has CUDA 12.9 — `ldd` confirms the mismatch. Nightly cu129 wheels from `https://wheels.vllm.ai/nightly/cu129` are the supported route until cu13 wheels are practical. Required env: `TORCH_CUDA_ARCH_LIST=12.0`, `CUDA_ARCHITECTURES=120`, `CUDA_HOME=/usr/local/cuda-12.9`. See [ADR-002](docs/adr/002-vllm-nightly-cu129.md).
 
-3. **`num_speculative_tokens=5`, not the model-card-recommended 4.** Measured: MTP=4 at 95–98 tok/s vs MTP=5 at 103.2 tok/s. 5% improvement is free; vLLM's >1 warning is generic and not specific to this hardware/draft combination. Acceptance rate 78%. See [ADR-003](docs/adr/003-mtp-num-spec-tokens-5.md).
+3. **`num_speculative_tokens=5`, not the model-card-recommended 4.** Measured: MTP=4 at 95–98 tok/s vs MTP=5 at 103.2 tok/s. 5% improvement is free; vLLM's >1 warning is generic and not specific to this hardware/draft combination. Initial 5-run acceptance rate 78%; sustained live-traffic acceptance 94–97% (re-measured 2026-05-23). See [ADR-003](docs/adr/003-mtp-num-spec-tokens-5.md).
 
 4. **`BCCard/gemma-4-31B-it-FP8-Dynamic`, not `nvidia/Gemma-4-31B-IT-NVFP4`.** Initial deployment chose NVFP4 due to the llmcompressor FP8 garbage-output bug (vLLM Issue #39407). The bug is patched for FP8-Dynamic specifically in vLLM nightly ≥0.20.2rc1; verified with a clean Korean Fibonacci output and GSM8K Platinum 0.977 vs NVFP4 ~0.94. Weights grew from 17 GB to 33 GB; served-model-name held constant. See [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md).
 
 5. **Hand-rolled FastAPI proxy in its own venv.** LiteLLM/Langfuse/Helicone all pull in more than ~10-user deployment needs and obscure the request log schema. ~300 lines, owns its log shape, boots in seconds with ~400 MB RAM, no torch. Lives in `.venv-proxy` so vLLM dependency changes can't break it. Code is versioned in a [separate repository](https://github.com/H4RUming/gemma4-vllm-proxy); this repo keeps [proxy/README.md](proxy/README.md) as the interface spec. See [ADR-005](docs/adr/005-logging-proxy-separation.md).
 
 6. **Three venvs (`.venv`, `.venv-proxy`, `.venv-quant`).** `llmcompressor` aggressively pins old torch/transformers and silently downgrades the serving environment if installed in `.venv` — ~90 minutes of recovery the first time. Role-separated venvs prevent the entire class of failure. See [ADR-006](docs/adr/006-llmcompressor-venv-isolation.md).
+
+7. **`--max-num-batched-tokens 32768` (explicit prefill chunk).** Bounds the per-step token budget so the activation envelope is predictable under bursty prefill, at the cost of ~14% KV pool (576,912 → 495,400 tokens). Pool is now a measured value, not a fixed promise. See [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md).
+
+---
+
+## Deployment layout (production host)
+
+The repository tree above shows how files are organized for review. On the production host, the working tree is **flat** — systemd unit files, wrapper scripts, and the proxy clone all live at the top level of `${LLM_OPS_DIR}` (default `/home/haru/Desktop/LLM-OPS`) because that's the `WorkingDirectory` declared in each `*.service` unit and `ExecStart=/home/haru/Desktop/LLM-OPS/run_vllm.sh` resolves there.
+
+```
+/home/haru/Desktop/LLM-OPS/        (= WorkingDirectory in both .service units)
+├── run_vllm.sh                    (from this repo's systemd/)
+├── run_proxy.sh                   (from this repo's systemd/)
+├── vllm-gemma4.service            (also installed under /etc/systemd/system/)
+├── vllm-proxy.service             (also installed under /etc/systemd/system/)
+├── proxy/                         (clone of github.com/H4RUming/gemma4-vllm-proxy)
+├── logs/                          (runtime, gitignored)
+├── hf-cache/                      (HF_HOME)
+├── .venv/                         (vLLM serving)
+├── .venv-proxy/                   (FastAPI proxy)
+└── .venv-quant/                   (llmcompressor; never installed in .venv)
+```
+
+The deploy step from `docs/deployment.md §9` copies `systemd/run_vllm.sh` and `systemd/run_proxy.sh` from this repo to `${LLM_OPS_DIR}/`, and copies the `.service` files to `/etc/systemd/system/`. The flat layout is intentional: it matches the absolute paths baked into the units, which keeps `daemon-reload → restart` self-contained.
 
 ---
 
@@ -174,6 +208,14 @@ Full procedure in [docs/deployment.md](docs/deployment.md).
 - **External port**: clients hit the proxy at `0.0.0.0:8000`. vLLM is bound to `127.0.0.1:8001` and never directly exposed.
 - **Served model name**: `gemma-4-31b-it` — held constant across the NVFP4 → FP8-Dynamic migration so clients did not change.
 - **First start**: `TimeoutStartSec=600` because FlashInfer JIT compile + CUDA graph capture takes 3–5 minutes on first launch after a model or vLLM version change.
+
+---
+
+## Investigations
+
+Dated troubleshooting notes live under [`docs/investigations/`](docs/investigations/). They capture the diagnostic path for a specific incident — what was observed, what was ruled out, what was changed — separate from the ADRs (which record decisions) and the benchmarks (which record measurements).
+
+- [2026-05-23 — prefill performance investigation](docs/investigations/2026-05-23-prefill-investigation.md). Diagnoses the ~90 → ~25 tok/s TPS regression after p50 input tokens grew 11× (to ~37K) on 2026-05-20. Pins the slowdown on prefill, locks in the `--max-num-batched-tokens 32768` setting recorded in [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md), and identifies client-side cache-key stability as the largest remaining win.
 
 ---
 

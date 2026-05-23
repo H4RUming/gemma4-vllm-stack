@@ -52,7 +52,8 @@ mean: **103.2 tok/s**, σ ~3.
 ## Speedup
 
 - Config C / Config A: **103.2 / 42.1 = 2.45x**
-- Acceptance rate (vLLM-reported): **78%**
+- Acceptance rate (vLLM-reported in the 5-run window): **78%**
+- **Sustained acceptance under live traffic (2026-05-23 re-check)**: **94–97%**, per-position 0.99 / 0.98 / 0.96 / 0.94 / 0.89, mean acceptance length 5.7–5.9 of 5 drafted. Throughput band 100–125 tok/s. See [ADR-003 §Sustained behavior](../../docs/adr/003-mtp-num-spec-tokens-5.md).
 
 ## Discussion
 

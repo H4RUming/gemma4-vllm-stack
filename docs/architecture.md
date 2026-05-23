@@ -18,6 +18,7 @@ Key serving flags:
 | `--host` / `--port`                 | `127.0.0.1` / `8001`                    | Loopback only; proxy is the public surface.                             |
 | `--max-model-len`                   | `262144`                                | 256K per-request context cap.                                           |
 | `--gpu-memory-utilization`          | `0.90`                                  | Leaves headroom for CUDA graphs + FlashInfer JIT scratch.               |
+| `--max-num-batched-tokens`          | `32768`                                 | Bounds the per-step prefill chunk; trades ~14% KV pool for predictable activation memory. See [ADR-007](adr/007-max-num-batched-tokens-32768.md). |
 | `--kv-cache-dtype`                  | `fp8`                                   | Standard FP8 e4m3, not TurboQuant. See [ADR-001](adr/001-fp8-kv-over-turboquant.md). |
 | `--async-scheduling`                | (flag)                                  | Overlaps prefill + decode; lower TTFT under concurrency.                |
 | `--reasoning-parser`                | `gemma4`                                | Splits `<think>…</think>` into the `reasoning_content` channel.         |
@@ -85,7 +86,7 @@ The operational discipline: `which python` before any `uv pip install` related t
    │  vLLM (:8001)                            │
    │  ├── MTP draft proposes k=5 tokens       │
    │  ├── target verifies in parallel         │
-   │  ├── FP8 KV cache (853K-token pool)      │
+   │  ├── FP8 KV cache (~495K-token pool)     │
    │  └── stream tokens back over SSE         │
    └──────────────────────────────────────────┘
         │

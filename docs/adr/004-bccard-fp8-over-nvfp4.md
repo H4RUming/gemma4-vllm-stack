@@ -45,7 +45,7 @@ NVFP4 MTP was never enabled in production because the garbage-output bug took pr
 ### Memory
 
 - Weights: NVFP4 **17 GB** → FP8-Dynamic **33 GB** (+16 GB)
-- KV pool: NVFP4 52K → FP8-Dynamic ~50K-ish raw tokens at BF16, but with `--kv-cache-dtype fp8` we still hit the configured **853K-token pool** because pool size is bounded by `gpu-memory-utilization` and KV dtype rather than weight footprint.
+- KV pool: NVFP4 52K → FP8-Dynamic ~50K-ish raw tokens at BF16, but with `--kv-cache-dtype fp8` the configured pool is **495,400 tokens** (measured 2026-05-23, after the `--max-num-batched-tokens` change in [ADR-007](007-max-num-batched-tokens-32768.md)); pool size is bounded by `gpu-memory-utilization` and KV dtype rather than weight footprint.
 
 Net: +16 GB of VRAM goes to weights; the operational KV envelope is unchanged.
 

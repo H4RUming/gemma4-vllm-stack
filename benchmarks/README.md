@@ -7,9 +7,10 @@ Performance evidence for the decisions in `docs/adr/`.
 | Configuration                          | Throughput      | vs baseline | Notes                  |
 | -------------------------------------- | --------------- | ----------- | ---------------------- |
 | Baseline (MTP disabled)                | 42.1 tok/s (σ 0.03) | 1.00x   | reference              |
-| MTP=5, single request                  | 103.2 tok/s (σ ~3)  | **2.45x** | acceptance rate 78%    |
+| MTP=5, single request                  | 103.2 tok/s (σ ~3)  | **2.45x** | initial 5-run benchmark, 78% acceptance |
 | MTP=5, 3 concurrent (per-request)      | ~99 tok/s       | 2.35x       | 96% of single-request  |
 | MTP=5, 3 concurrent (aggregate)        | **294 tok/s**   | **7.0x**    | wall time +6% vs single |
+| MTP=5, sustained (live, 2026-05-23)    | 100–125 tok/s   | 2.4–3.0x    | acceptance 94–97%, mean accept length 5.7–5.9 of 5 |
 
 ## Methodology
 

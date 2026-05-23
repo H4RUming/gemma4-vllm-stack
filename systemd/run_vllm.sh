@@ -34,6 +34,7 @@ exec vllm serve "${MODEL}" \
   --host 127.0.0.1 \
   --port 8001 \
   --max-model-len 262144 \
+  --max-num-batched-tokens 32768 \
   --gpu-memory-utilization 0.90 \
   --kv-cache-dtype fp8 \
   --async-scheduling \

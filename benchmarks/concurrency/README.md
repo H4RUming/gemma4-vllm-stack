@@ -7,7 +7,7 @@ How throughput holds up as concurrent requests grow.
 - MTP=5 (`google/gemma-4-31B-it-assistant`)
 - `--kv-cache-dtype fp8`
 - `--max-model-len 262144` (256K)
-- KV pool: 853K tokens
+- KV pool: 495,400 tokens (current, post `--max-num-batched-tokens 32768`; initial concurrency benchmark below predates that change — see [ADR-007](../../docs/adr/007-max-num-batched-tokens-32768.md))
 - `max_tokens=800` per request
 - 3 distinct deterministic Korean prompts (different topics, same length class)
 

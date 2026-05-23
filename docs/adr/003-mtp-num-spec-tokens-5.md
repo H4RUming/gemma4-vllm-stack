@@ -38,7 +38,24 @@ Run 5: 7.778s → 102.9 tok/s
 mean: 103.2 tok/s, σ ~3
 ```
 
-Speedup: **103.2 / 42.1 = 2.45x**. Acceptance rate reported by vLLM: **78%**.
+Speedup: **103.2 / 42.1 = 2.45x**. Acceptance rate reported by vLLM in this 5-run window: **78%**.
+
+### Sustained behavior (2026-05-23 re-check on `vllm-gemma4.service`)
+
+Spec-decoding metrics observed on long reasoning streams under live traffic, after the `--max-num-batched-tokens 32768` change ([ADR-007](007-max-num-batched-tokens-32768.md)):
+
+```
+Per-position acceptance: 0.99, 0.98, 0.96, 0.94, 0.89
+Avg Draft acceptance rate: 94–97%
+Mean acceptance length:    5.7–5.9 (of 5 drafted)
+Accepted throughput:       100–125 tokens/s
+```
+
+Two readings of the 78% vs 94–97% gap:
+- The 5-run benchmark used short, deterministic Korean prompts where acceptance per-position is dragged down by the last-position drop-off; in sustained reasoning traffic with longer continuations, acceptance climbs.
+- The original measurement may pre-date vLLM scheduler improvements that landed alongside the cu129 nightly upgrade.
+
+Both readings point at the same operational conclusion: **94–97% is the realistic acceptance rate to plan against**, and the 78% headline is best read as a worst-case bound from the synthetic benchmark.
 
 ### MTP=4 (model-card recommended)
 
