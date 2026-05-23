@@ -44,7 +44,7 @@ MTP=4 (모델 카드 권장값)는 95–98 tok/s로 측정되어, 채택한 MTP=
 | 모델               | `BCCard/gemma-4-31B-it-FP8-Dynamic`             | GSM8K Platinum 0.977 (BF16 baseline 0.976), 출력 깨끗함. [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md) 참고.        |
 | 드래프트 헤드      | `google/gemma-4-31B-it-assistant` (78.8M, 약 150 MB BF16) | `num_speculative_tokens=5`에서 78% acceptance rate로 동작하는 MTP 타깃.                                       |
 | KV 캐시            | `--kv-cache-dtype fp8` (표준 FP8 e4m3)          | Gemma 4에서는 TurboQuant가 막혀 있다 (TRITON_ATTN 백엔드, `kv_cache_dtype` 미지원). [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md) 참고. |
-| 프록시             | 별도 `.venv-proxy`의 FastAPI (torch 없음)       | 로깅, 샘플링 기본값, thinking 파라미터 정규화 담당. [ADR-005](docs/adr/005-logging-proxy-separation.md) 참고.          |
+| 프록시             | 별도 `.venv-proxy`의 FastAPI (torch 없음). 코드는 [별도 레포](#) <!-- TODO: update proxy repo URL --> | 로깅, 샘플링 기본값, thinking 파라미터 정규화 담당. 인터페이스 명세는 [proxy/README.md](proxy/README.md), 결정 배경은 [ADR-005](docs/adr/005-logging-proxy-separation.md) 참고. |
 | 감시(Supervision)  | systemd 2개 unit (proxy가 vLLM을 `Requires=`)   | 재시작이 연쇄로 일어난다. 재부팅에 안전.                                                                               |
 | 패키지 매니저      | `uv` (Python 3.12)                              | 재현 가능한 설치. nightly 휠을 위한 `--extra-index-url`을 매끄럽게 처리한다.                                            |
 
@@ -103,12 +103,7 @@ gemma4-vllm-stack/
 │   ├── run_vllm.sh
 │   └── run_proxy.sh
 ├── proxy/
-│   ├── README.md
-│   ├── app.py
-│   ├── adapters.py
-│   ├── logging.py
-│   ├── config.py
-│   └── requirements.txt
+│   └── README.md          # 인터페이스 명세만 보관 — 코드는 별도 레포
 ├── benchmarks/
 │   ├── README.md
 │   ├── mtp-tuning/
@@ -166,7 +161,7 @@ sudo systemctl enable --now vllm-gemma4.service vllm-proxy.service
 
 4. **`BCCard/gemma-4-31B-it-FP8-Dynamic`, `nvidia/Gemma-4-31B-IT-NVFP4` 아님.** 초기 배포에서는 llmcompressor FP8 garbage-output 버그 (vLLM Issue #39407) 때문에 NVFP4를 골랐다. 이 버그는 vLLM nightly ≥ 0.20.2rc1에서 FP8-Dynamic에 한해 패치되었다. 한국어 피보나치 프롬프트로 깨끗한 출력 확인, GSM8K Platinum 0.977 (NVFP4는 약 0.94). 가중치는 17 GB → 33 GB로 늘었지만 served-model-name은 동일하게 유지. [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md) 참고.
 
-5. **자체 제작한 FastAPI 프록시, 별도 venv.** LiteLLM/Langfuse/Helicone 모두 ~10명 규모 배포가 필요로 하는 것 이상을 끌어오고 요청 로그 스키마를 가린다. 약 300줄, 자체 로그 스키마 소유, 수 초 안에 부팅, 약 400 MB RAM, torch 없음. `.venv-proxy`에 들어가 있으므로 vLLM 의존성 변경이 프록시를 깨뜨릴 수 없다. [ADR-005](docs/adr/005-logging-proxy-separation.md) 참고.
+5. **자체 제작한 FastAPI 프록시, 별도 venv.** LiteLLM/Langfuse/Helicone 모두 ~10명 규모 배포가 필요로 하는 것 이상을 끌어오고 요청 로그 스키마를 가린다. 약 300줄, 자체 로그 스키마 소유, 수 초 안에 부팅, 약 400 MB RAM, torch 없음. `.venv-proxy`에 들어가 있으므로 vLLM 의존성 변경이 프록시를 깨뜨릴 수 없다. 코드는 [별도 레포](#)에서 버전 관리하며 <!-- TODO: update proxy repo URL -->, 이 레포에는 인터페이스 명세인 [proxy/README.md](proxy/README.md)만 둔다. [ADR-005](docs/adr/005-logging-proxy-separation.md) 참고.
 
 6. **venv 3개 (`.venv`, `.venv-proxy`, `.venv-quant`).** `llmcompressor`는 오래된 torch/transformers를 강하게 핀하기 때문에 `.venv`에 설치하면 서빙 환경을 조용히 다운그레이드시킨다 — 처음 당했을 때 복구에 약 90분 걸렸다. 역할별 venv 분리는 이 전체 부류의 실패를 차단한다. [ADR-006](docs/adr/006-llmcompressor-venv-isolation.md) 참고.
 

@@ -4,6 +4,8 @@
 
 Accepted, 2026-04-30.
 
+> **Implementation location.** The proxy code is versioned in a [separate repository](#) <!-- TODO: update proxy repo URL --> and cloned to `${LLM_OPS_DIR}/proxy/` at deploy time. This ADR records the design decision; the interface specification is at [proxy/README.md](../../proxy/README.md).
+
 ## Context
 
 vLLM's OpenAI-compatible server logs to stdout but does not provide:

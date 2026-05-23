@@ -27,7 +27,7 @@ Key serving flags:
 
 ### `vllm-proxy.service`
 
-Async FastAPI proxy bound to `0.0.0.0:8000`. Lives in `.venv-proxy` (no torch, no CUDA). Three responsibilities:
+Async FastAPI proxy bound to `0.0.0.0:8000`. Lives in `.venv-proxy` (no torch, no CUDA). Code is versioned in a [separate repository](#) <!-- TODO: update proxy repo URL --> and cloned to `${LLM_OPS_DIR}/proxy/` at deploy time; this repo keeps [proxy/README.md](../proxy/README.md) as the interface specification. Three responsibilities:
 
 1. **Normalize thinking-mode parameters.** Accept any of `reasoning_effort`, `extra_body.thinking`, `thinking_config`, or canonical `chat_template_kwargs.enable_thinking`; collapse to the canonical form before forwarding. Default ON.
 2. **Inject sampling defaults the client omits.** `temperature=1.0, top_p=0.95, top_k=64` via `setdefault` — never overwrite a client value.

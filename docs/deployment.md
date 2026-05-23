@@ -110,15 +110,21 @@ If you maintain a private mirror or need `HF_TOKEN`, set it in `configs/.env` be
 
 ## 8. Proxy venv setup (`.venv-proxy`)
 
+The proxy code lives in a [separate repository](#) <!-- TODO: update proxy repo URL -->. Clone it into the working directory before installing dependencies, so the wrapper script's `cd "${LLM_OPS_DIR}/proxy"` resolves correctly.
+
 ```bash
-uv pip install --python .venv-proxy/bin/python -r proxy/requirements.txt
+# Clone proxy repo into ~/Desktop/LLM-OPS/proxy
+# TODO: replace URL once the proxy repo is published
+git clone <PROXY_REPO_URL> "${LLM_OPS_DIR}/proxy"
+
+uv pip install --python .venv-proxy/bin/python -r "${LLM_OPS_DIR}/proxy/requirements.txt"
 
 # Verify torch is NOT present
 .venv-proxy/bin/python -c "import torch" 2>&1 | grep -i "no module named 'torch'"
 # 기대: 위 grep이 매치되어야 함 — torch가 없는 게 정상.
 ```
 
-The proxy stays light on purpose. If `import torch` ever succeeds in `.venv-proxy`, something pulled it in transitively — find and pin the culprit before deploying.
+The proxy stays light on purpose. If `import torch` ever succeeds in `.venv-proxy`, something pulled it in transitively — find and pin the culprit before deploying. The interface contract this proxy must satisfy is documented at [proxy/README.md](../proxy/README.md).
 
 ---
 
