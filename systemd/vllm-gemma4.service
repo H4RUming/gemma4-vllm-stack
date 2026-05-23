@@ -1,0 +1,37 @@
+[Unit]
+Description=vLLM Gemma 4 31B FP8 Dynamic inference server
+After=network-online.target nvidia-persistenced.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=haru
+Group=haru
+WorkingDirectory=/home/haru/Desktop/LLM-OPS
+
+Environment="TORCH_CUDA_ARCH_LIST=12.0"
+Environment="CUDA_ARCHITECTURES=120"
+Environment="CUDA_HOME=/usr/local/cuda-12.9"
+Environment="PATH=/home/haru/Desktop/LLM-OPS/.venv/bin:/usr/local/cuda-12.9/bin:/usr/bin:/bin"
+Environment="LD_LIBRARY_PATH=/usr/local/cuda-12.9/lib64"
+Environment="CUDA_VISIBLE_DEVICES=0"
+
+ExecStart=/home/haru/Desktop/LLM-OPS/run_vllm.sh
+
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=600
+StartLimitBurst=3
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vllm-gemma4
+
+TimeoutStartSec=600
+TimeoutStopSec=60
+
+KillSignal=SIGINT
+SendSIGKILL=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv*/
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Logs
+logs/
+*.jsonl
+*.log
+
+# Local config / secrets
+.env
+configs/.env
+
+# Models / weights
+models/
+*.safetensors
+*.gguf
+*.bin
+
+# Editor & OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Caches
+.cache/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+/SCAFFOLD_INSTRUCTIONS.md

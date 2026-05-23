@@ -1,0 +1,6 @@
+fastapi>=0.115
+httpx>=0.27
+uvicorn[standard]>=0.30
+transformers>=5.5
+tokenizers>=0.20
+anyio>=4

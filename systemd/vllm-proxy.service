@@ -1,0 +1,25 @@
+[Unit]
+Description=LLM-OPS logging proxy (FastAPI)
+After=vllm-gemma4.service network-online.target
+Requires=vllm-gemma4.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=haru
+Group=haru
+WorkingDirectory=/home/haru/Desktop/LLM-OPS
+
+ExecStart=/home/haru/Desktop/LLM-OPS/run_proxy.sh
+
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vllm-proxy
+
+[Install]
+WantedBy=multi-user.target
