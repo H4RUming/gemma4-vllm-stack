@@ -2,7 +2,7 @@
 
 [![English](https://img.shields.io/badge/English-lightgrey?style=flat-square)](README.md) [![한국어](https://img.shields.io/badge/%ED%95%9C%EA%B5%AD%EC%96%B4-blue?style=flat-square)](README.ko.md) [![日本語](https://img.shields.io/badge/%E6%97%A5%E6%9C%AC%E8%AA%9E-lightgrey?style=flat-square)](README.ja.md)
 
-RTX PRO 6000 Blackwell 위에서 Gemma 4 31B를 서빙하기 위한 프로덕션급 vLLM 스택. FP8 KV 캐시, MTP 추측 디코딩, 비동기 FastAPI 로깅 프록시까지 한 세트로 묶었다.
+RTX PRO 6000 Blackwell 위에서 Gemma 4 31B를 서빙하기 위한 vLLM 스택. FP8 KV 캐시, MTP 추측 디코딩, 비동기 FastAPI 로깅 프록시까지 한 세트로 묶었다.
 
 ---
 
