@@ -110,12 +110,11 @@ If you maintain a private mirror or need `HF_TOKEN`, set it in `configs/.env` be
 
 ## 8. Proxy venv setup (`.venv-proxy`)
 
-The proxy code lives in a [separate repository](#) <!-- TODO: update proxy repo URL -->. Clone it into the working directory before installing dependencies, so the wrapper script's `cd "${LLM_OPS_DIR}/proxy"` resolves correctly.
+The proxy code lives in a [separate repository](https://github.com/H4RUming/gemma4-vllm-proxy). Clone it into the working directory before installing dependencies, so the wrapper script's `cd "${LLM_OPS_DIR}/proxy"` resolves correctly.
 
 ```bash
 # Clone proxy repo into ~/Desktop/LLM-OPS/proxy
-# TODO: replace URL once the proxy repo is published
-git clone <PROXY_REPO_URL> "${LLM_OPS_DIR}/proxy"
+git clone https://github.com/H4RUming/gemma4-vllm-proxy "${LLM_OPS_DIR}/proxy"
 
 uv pip install --python .venv-proxy/bin/python -r "${LLM_OPS_DIR}/proxy/requirements.txt"
 

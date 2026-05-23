@@ -44,7 +44,7 @@ MTP=4 (モデルカード推奨値) は 95–98 tok/s で、採用した MTP=5 �
 | モデル             | `BCCard/gemma-4-31B-it-FP8-Dynamic`             | GSM8K Platinum 0.977 (BF16 baseline 0.976)、出力が崩れない。[ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md) 参照。    |
 | ドラフトヘッド     | `google/gemma-4-31B-it-assistant` (78.8M、約 150 MB BF16) | `num_speculative_tokens=5` で acceptance rate 78% を達成する MTP ターゲット。                                |
 | KV キャッシュ      | `--kv-cache-dtype fp8` (標準 FP8 e4m3)          | Gemma 4 では TurboQuant が使えない (TRITON_ATTN バックエンドが `kv_cache_dtype` 未対応)。[ADR-001](docs/adr/001-fp8-kv-over-turboquant.md) 参照。 |
-| プロキシ           | 別 venv `.venv-proxy` 上の FastAPI (torch 無し)。コードは[別リポジトリ](#) <!-- TODO: update proxy repo URL --> | ロギング、サンプリングデフォルト、thinking パラメータの正規化を担当。インターフェース仕様は [proxy/README.md](proxy/README.md)、決定の背景は [ADR-005](docs/adr/005-logging-proxy-separation.md) を参照。 |
+| プロキシ           | 別 venv `.venv-proxy` 上の FastAPI (torch 無し)。コードは[別リポジトリ](https://github.com/H4RUming/gemma4-vllm-proxy) | ロギング、サンプリングデフォルト、thinking パラメータの正規化を担当。インターフェース仕様は [proxy/README.md](proxy/README.md)、決定の背景は [ADR-005](docs/adr/005-logging-proxy-separation.md) を参照。 |
 | プロセス管理       | systemd 2 ユニット (proxy が vLLM を `Requires=`) | 再起動が連鎖する。再起動に耐える。                                                                                    |
 | パッケージマネージャ | `uv` (Python 3.12)                              | 再現性のあるインストール。nightly ホイール用の `--extra-index-url` をきれいに扱える。                                  |
 
@@ -161,7 +161,7 @@ sudo systemctl enable --now vllm-gemma4.service vllm-proxy.service
 
 4. **`BCCard/gemma-4-31B-it-FP8-Dynamic`、`nvidia/Gemma-4-31B-IT-NVFP4` ではない。** 初期デプロイでは llmcompressor の FP8 garbage-output バグ (vLLM Issue #39407) のため NVFP4 を選択していた。このバグは vLLM nightly ≥ 0.20.2rc1 において FP8-Dynamic 限定でパッチされた。韓国語のフィボナッチプロンプトで出力が崩れないことを確認し、GSM8K Platinum 0.977 (NVFP4 は約 0.94)。重みは 17 GB → 33 GB に増えたが、served-model-name は変更しなかった。[ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md) 参照。
 
-5. **自作 FastAPI プロキシを別 venv で運用。** LiteLLM/Langfuse/Helicone はいずれも ~10 名規模のデプロイに必要なものを超える依存を引き込み、リクエストログのスキーマを覆い隠す。約 300 行、自前のログスキーマ、外部ストレージ無し、数秒で起動、約 400 MB RAM、torch 無し。`.venv-proxy` に配置することで vLLM の依存変更がプロキシを壊さない。コードは[別リポジトリ](#)でバージョン管理しており <!-- TODO: update proxy repo URL -->、このリポジトリにはインターフェース仕様としての [proxy/README.md](proxy/README.md) のみを残している。[ADR-005](docs/adr/005-logging-proxy-separation.md) 参照。
+5. **自作 FastAPI プロキシを別 venv で運用。** LiteLLM/Langfuse/Helicone はいずれも ~10 名規模のデプロイに必要なものを超える依存を引き込み、リクエストログのスキーマを覆い隠す。約 300 行、自前のログスキーマ、外部ストレージ無し、数秒で起動、約 400 MB RAM、torch 無し。`.venv-proxy` に配置することで vLLM の依存変更がプロキシを壊さない。コードは[別リポジトリ](https://github.com/H4RUming/gemma4-vllm-proxy)でバージョン管理しており、このリポジトリにはインターフェース仕様としての [proxy/README.md](proxy/README.md) のみを残している。[ADR-005](docs/adr/005-logging-proxy-separation.md) 参照。
 
 6. **venv を 3 つ (`.venv`、`.venv-proxy`、`.venv-quant`)。** `llmcompressor` は古い torch/transformers を強く pin するため、`.venv` にインストールするとサービング環境を静かにダウングレードしてしまう — 最初に踏んだときは復旧に約 90 分かかった。役割ごとに venv を分けることで、この種の障害そのものを排除している。[ADR-006](docs/adr/006-llmcompressor-venv-isolation.md) 参照。
 

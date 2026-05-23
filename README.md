@@ -44,7 +44,7 @@ MTP=4 (model-card recommended) measured at 95–98 tok/s, ~5% below the chosen M
 | Model              | `BCCard/gemma-4-31B-it-FP8-Dynamic`             | GSM8K Platinum 0.977 (BF16 baseline 0.976); clean output. See [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md). |
 | Draft head         | `google/gemma-4-31B-it-assistant` (78.8M, ~150 MB BF16) | MTP target with 78% acceptance rate at `num_speculative_tokens=5`.                  |
 | KV cache           | `--kv-cache-dtype fp8` (standard FP8 e4m3)      | TurboQuant blocked on Gemma 4 (TRITON_ATTN backend, no kv_cache_dtype). See [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md). |
-| Proxy              | FastAPI in separate `.venv-proxy` (no torch); code in [separate repo](#) <!-- TODO: update proxy repo URL --> | Logging, sampling defaults, thinking-param normalization. Interface spec in [proxy/README.md](proxy/README.md); rationale in [ADR-005](docs/adr/005-logging-proxy-separation.md). |
+| Proxy              | FastAPI in separate `.venv-proxy` (no torch); code in [separate repo](https://github.com/H4RUming/gemma4-vllm-proxy) | Logging, sampling defaults, thinking-param normalization. Interface spec in [proxy/README.md](proxy/README.md); rationale in [ADR-005](docs/adr/005-logging-proxy-separation.md). |
 | Supervision        | systemd (two units, proxy `Requires=` vLLM)     | Cascading restarts; reboot-safe.                                                          |
 | Package manager    | `uv` (Python 3.12)                              | Reproducible installs; handles `--extra-index-url` for nightly wheels cleanly.            |
 
@@ -161,7 +161,7 @@ Full procedure in [docs/deployment.md](docs/deployment.md).
 
 4. **`BCCard/gemma-4-31B-it-FP8-Dynamic`, not `nvidia/Gemma-4-31B-IT-NVFP4`.** Initial deployment chose NVFP4 due to the llmcompressor FP8 garbage-output bug (vLLM Issue #39407). The bug is patched for FP8-Dynamic specifically in vLLM nightly ≥0.20.2rc1; verified with a clean Korean Fibonacci output and GSM8K Platinum 0.977 vs NVFP4 ~0.94. Weights grew from 17 GB to 33 GB; served-model-name held constant. See [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md).
 
-5. **Hand-rolled FastAPI proxy in its own venv.** LiteLLM/Langfuse/Helicone all pull in more than ~10-user deployment needs and obscure the request log schema. ~300 lines, owns its log shape, boots in seconds with ~400 MB RAM, no torch. Lives in `.venv-proxy` so vLLM dependency changes can't break it. Code is versioned in a [separate repository](#) <!-- TODO: update proxy repo URL -->; this repo keeps [proxy/README.md](proxy/README.md) as the interface spec. See [ADR-005](docs/adr/005-logging-proxy-separation.md).
+5. **Hand-rolled FastAPI proxy in its own venv.** LiteLLM/Langfuse/Helicone all pull in more than ~10-user deployment needs and obscure the request log schema. ~300 lines, owns its log shape, boots in seconds with ~400 MB RAM, no torch. Lives in `.venv-proxy` so vLLM dependency changes can't break it. Code is versioned in a [separate repository](https://github.com/H4RUming/gemma4-vllm-proxy); this repo keeps [proxy/README.md](proxy/README.md) as the interface spec. See [ADR-005](docs/adr/005-logging-proxy-separation.md).
 
 6. **Three venvs (`.venv`, `.venv-proxy`, `.venv-quant`).** `llmcompressor` aggressively pins old torch/transformers and silently downgrades the serving environment if installed in `.venv` — ~90 minutes of recovery the first time. Role-separated venvs prevent the entire class of failure. See [ADR-006](docs/adr/006-llmcompressor-venv-isolation.md).
 

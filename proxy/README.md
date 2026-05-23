@@ -1,7 +1,7 @@
 # LLM-OPS logging proxy — interface specification
 
 > **Code lives in a separate repository.**
-> Repository: [TBD](#) <!-- TODO: update proxy repo URL -->
+> Repository: [gemma4-vllm-proxy](https://github.com/H4RUming/gemma4-vllm-proxy)
 >
 > This directory keeps only the interface specification — what the proxy does, the request/response contract, and the JSONL log schema — so the stack documentation here stays self-contained. The implementation is versioned independently so its dependencies (`fastapi`, `httpx`, `uvicorn`) can iterate without touching the serving environment.
 
