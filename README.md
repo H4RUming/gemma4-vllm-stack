@@ -2,13 +2,15 @@
 
 **English** · [한국어](README.ko.md)
 
-vLLM serving stack for Gemma 4 31B on RTX PRO 6000 Blackwell, with FP8 KV cache, MTP speculative decoding, and an async FastAPI logging proxy in front.
+> **Note:** This English page is a machine translation of [README.ko.md](README.ko.md) produced with an AI tool. The Korean version is authoritative; if the two disagree, trust the Korean.
+
+A vLLM stack for serving LLMs on RTX PRO 6000 Blackwell. Focused on improving usability by adding an async FastAPI logging proxy in front.
 
 ---
 
 ## Results
 
-Single GPU, 800-token decode, deterministic Korean prompt, 5-run mean.
+Single GPU, Gemma 4 31B model, 800-token decode, deterministic Korean prompt, 5-run mean.
 
 | Configuration               | Throughput      | vs baseline | Notes                              |
 | --------------------------- | --------------- | ----------- | ---------------------------------- |
@@ -173,7 +175,7 @@ Full procedure in [docs/deployment.md](docs/deployment.md).
 
 5. **Hand-rolled FastAPI proxy in its own venv.** LiteLLM/Langfuse/Helicone all pull in more than ~10-user deployment needs and obscure the request log schema. ~300 lines, owns its log shape, boots in seconds with ~400 MB RAM, no torch. Lives in `.venv-proxy` so vLLM dependency changes can't break it. Code is versioned in a [separate repository](https://github.com/H4RUming/gemma4-vllm-proxy); this repo keeps [proxy/README.md](proxy/README.md) as the interface spec. See [ADR-005](docs/adr/005-logging-proxy-separation.md).
 
-6. **Three venvs (`.venv`, `.venv-proxy`, `.venv-quant`).** `llmcompressor` aggressively pins old torch/transformers and silently downgrades the serving environment if installed in `.venv` — ~90 minutes of recovery the first time. Role-separated venvs prevent the entire class of failure. See [ADR-006](docs/adr/006-llmcompressor-venv-isolation.md).
+6. **Three venvs (`.venv`, `.venv-proxy`, `.venv-quant`).** `llmcompressor` aggressively pins old torch/transformers and silently downgrades the serving environment if installed in `.venv`. Role-separated venvs prevent the entire class of failure. See [ADR-006](docs/adr/006-llmcompressor-venv-isolation.md).
 
 7. **`--max-num-batched-tokens 32768` (explicit prefill chunk).** Bounds the per-step token budget so the activation envelope is predictable under bursty prefill, at the cost of ~14% KV pool (576,912 → 495,400 tokens). Pool is now a measured value, not a fixed promise. See [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md).
 
@@ -227,4 +229,4 @@ Running in production for an internal ~10-user lab; reboot-tested, surviving dri
 
 ## Notes
 
-AI tools were used to assist with content organization and grammar editing on this page.
+AI tools were used to organize the content of this page. (mainly for building the Markdown tables, drawing the diagrams, and links)

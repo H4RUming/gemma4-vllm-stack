@@ -2,13 +2,14 @@
 
 [English](README.md) · **한국어**
 
-RTX PRO 6000 Blackwell 위에서 Gemma 4 31B를 서빙하기 위한 vLLM 스택. FP8 KV 캐시, MTP 추측 디코딩, 비동기 FastAPI 로깅 프록시까지 한 세트로 묶었다.
+RTX PRO 6000 Blackwell 위에서 LLM을 서빙하기 위한 vLLM 스택. 
+비동기 FastAPI 로깅 프록시를 추가해서 사용성을 높이는데에 집중함.
 
 ---
 
 ## 측정 결과
 
-단일 GPU, 800-token 디코드, 결정적 한국어 프롬프트, 5회 평균.
+단일 GPU, Gemma4 31b 모델 사용, 800-token 디코드, 결정적 한국어 프롬프트, 5회 평균.
 
 | 구성                                | 처리량              | 베이스라인 대비 | 비고                                |
 | ----------------------------------- | ------------------- | --------------- | ----------------------------------- |
@@ -42,18 +43,18 @@ curl -s http://127.0.0.1:8001/metrics | grep -E 'num_gpu_blocks|kv_cache_memory_
 
 | 계층               | 선택                                            | 이유                                                                                                                  |
 | ------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| GPU                | RTX PRO 6000 Blackwell, 96 GB VRAM (SM120)      | 단일 카드로 31B를 256K 컨텍스트까지 올릴 수 있다.                                                                       |
-| 드라이버           | NVIDIA 595.58.03 (CUDA 13.2 호환 표시)          | 안정적인 Blackwell 드라이버. vLLM이 cu129 휠을 배포하므로 CUDA 13 툴킷은 필요 없다.                                     |
-| CUDA Toolkit       | 12.9                                            | FlashInfer SM120 JIT 컴파일에 필수.                                                                                   |
-| vLLM               | nightly cu129 (≥ 0.20.2rc1.dev128)              | PyPI 안정 휠은 libcudart.so.13에 링크되어 있다. nightly cu129가 설치된 툴킷과 맞는다. [ADR-002](docs/adr/002-vllm-nightly-cu129.md) 참고. |
-| PyTorch            | 2.11.0+cu129                                    | vLLM nightly가 끌어온다. CUDA 12.9에 맞춰져 있다.                                                                       |
-| transformers       | 5.8.0 (≥ 5.5 필수)                              | Gemma 4 아키텍처 지원이 5.5에서 들어왔다.                                                                              |
-| 모델               | `BCCard/gemma-4-31B-it-FP8-Dynamic`             | GSM8K Platinum 0.977 (BF16 baseline 0.976), 출력 깨끗함. [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md) 참고.        |
+| GPU                | RTX PRO 6000 Blackwell, 96 GB VRAM (SM120)      | 단일 카드로 31B를 256K 컨텍스트까지 올릴 수 있었음.                                                                       |
+| 드라이버           | NVIDIA 595.58.03 (CUDA 13.2 호환 표시)          | 안정적인 Blackwell 드라이버. vLLM이 cu129 휠을 배포하므로 CUDA 13 툴킷은 필요 없었음.                                     |
+| CUDA Toolkit       | 12.9                                            | FlashInfer SM120 JIT 컴파일에 필수적으로 사용됨.                                                                                   |
+| vLLM               | nightly cu129 (≥ 0.20.2rc1.dev128)              | PyPI 안정 휠은 libcudart.so.13에 링크되어 있음. nightly cu129가 설치된 툴킷과 일치함. [ADR-002](docs/adr/002-vllm-nightly-cu129.md) |
+| PyTorch            | 2.11.0+cu129                                    | vLLM nightly가 끌어와서 사용. CUDA 12.9에 맞춰져 있음.                                                                       |
+| transformers       | 5.8.0 (≥ 5.5 필수)                              | Gemma 4 아키텍처 지원이 5.5에서 추가됨.                                                                              |
+| 모델               | `BCCard/gemma-4-31B-it-FP8-Dynamic`             | GSM8K Platinum 0.977 (BF16 baseline 0.976), 출력 깨끗함. [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md)        |
 | 드래프트 헤드      | `google/gemma-4-31B-it-assistant` (78.8M, 약 150 MB BF16) | `num_speculative_tokens=5`에서 78% acceptance rate로 동작하는 MTP 타깃.                                       |
-| KV 캐시            | `--kv-cache-dtype fp8` (표준 FP8 e4m3)          | Gemma 4에서는 TurboQuant가 막혀 있다 (TRITON_ATTN 백엔드, `kv_cache_dtype` 미지원). [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md) 참고. |
-| 프록시             | 별도 `.venv-proxy`의 FastAPI (torch 없음). 코드는 [별도 레포](https://github.com/H4RUming/gemma4-vllm-proxy) | 로깅, 샘플링 기본값, thinking 파라미터 정규화 담당. 인터페이스 명세는 [proxy/README.md](proxy/README.md), 결정 배경은 [ADR-005](docs/adr/005-logging-proxy-separation.md) 참고. |
-| 감시(Supervision)  | systemd 2개 unit (proxy가 vLLM을 `Requires=`)   | 재시작이 연쇄로 일어난다. 재부팅에 안전.                                                                               |
-| 패키지 매니저      | `uv` (Python 3.12)                              | 재현 가능한 설치. nightly 휠을 위한 `--extra-index-url`을 매끄럽게 처리한다.                                            |
+| KV 캐시            | `--kv-cache-dtype fp8` (표준 FP8 e4m3)          | Gemma 4에서는 TurboQuant가 막혀 있음 (TRITON_ATTN 백엔드, `kv_cache_dtype` 미지원). [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md) |
+| 프록시             | 별도 `.venv-proxy`의 FastAPI (torch 없음). 코드는 [별도 레포](https://github.com/H4RUming/gemma4-vllm-proxy) | 로깅, 샘플링 기본값, thinking 파라미터 정규화를 담당함. 인터페이스 명세는 [proxy/README.md](proxy/README.md), 결정 배경은 [ADR-005](docs/adr/005-logging-proxy-separation.md)에 명시됨. |
+| 감시(Supervision)  | systemd 2개 unit (proxy가 vLLM을 `Requires=`)   | 자동 재시작을 통해 재부팅에 안전하도록 구성.                                                                               |
+| 패키지 매니저      | `uv` (Python 3.12)                              | nightly 휠을 위한 `--extra-index-url`을 매끄럽게 처리함.                                            |
 
 ---
 
@@ -133,7 +134,7 @@ gemma4-vllm-stack/
 sudo apt install -y nvidia-driver-595 nvidia-utils-595
 sudo systemctl enable --now nvidia-persistenced
 
-# 2. CUDA Toolkit 12.9 (PATH에는 추가하지 말 것 — systemd unit이 직접 주입한다)
+# 2. CUDA Toolkit 12.9 (PATH에는 추가하지 말 것. systemd unit이 직접 주입한다)
 sudo apt install -y cuda-toolkit-12-9
 
 # 3. Python 3.12 + uv
@@ -163,25 +164,25 @@ sudo systemctl enable --now vllm-gemma4.service vllm-proxy.service
 
 ## 핵심 결정 (요약)
 
-1. **FP8 KV 캐시, TurboQuant 아님.** Gemma 4에서 TurboQuant는 두 개의 독립적인 이슈로 막혀 있다. 첫째, 비대칭 head dimension (256 local, 512 global)이 `TRITON_ATTN` 백엔드를 강제하는데 이 백엔드는 `kv_cache_dtype`을 구현하지 않는다. 둘째, vLLM PR #40534가 추가한 `use_bidirectional_attention='vision'`이 full-attention 레이어에까지 `use_mm_prefix=True`를 전파한다. 표준 FP8 e4m3로 측정 가능한 정확도 손실 없이 디코드 ITL을 약 32% 개선한다. 현재 풀 크기는 495,400 토큰 / 256K에서 ~1.89x 보장 동시성이며, 이 값은 [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md)의 청크 사이즈 선택에 의해 결정된다. [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md) 참고.
+1. **FP8 KV 캐시, TurboQuant 아님.** Gemma 4에서 TurboQuant는 두 개의 독립적인 이슈로 막혀 있음. 첫째, 비대칭 head dimension (256 local, 512 global)이 `TRITON_ATTN` 백엔드를 강제하는데 이 백엔드는 `kv_cache_dtype`을 구현하지 않음. 둘째, vLLM PR #40534가 추가한 `use_bidirectional_attention='vision'`이 full-attention 레이어에까지 `use_mm_prefix=True`를 전파함. 표준 FP8 e4m3로 측정 가능한 정확도 손실 거의 없이 디코드 ITL을 약 32% 개선함. 현재 풀 크기는 495,400 토큰 / 256K에서 ~1.89x 보장 동시성이며, 이 값은 [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md)의 청크 사이즈 선택에 의해 결정됨. [ADR-001](docs/adr/001-fp8-kv-over-turboquant.md)
 
-2. **vLLM nightly cu129, PyPI 안정판 아님.** PyPI 휠은 `libcudart.so.13`에 링크되어 있고 시스템에는 CUDA 12.9가 있다 — `ldd`로 불일치가 확인된다. `https://wheels.vllm.ai/nightly/cu129`의 nightly 휠이 cu13 휠이 실용화되기 전까지의 유일한 정공법이다. 필수 환경변수: `TORCH_CUDA_ARCH_LIST=12.0`, `CUDA_ARCHITECTURES=120`, `CUDA_HOME=/usr/local/cuda-12.9`. [ADR-002](docs/adr/002-vllm-nightly-cu129.md) 참고.
+2. **vLLM nightly cu129, PyPI 안정판 아님.** PyPI 휠은 `libcudart.so.13`에 링크되어 있고 시스템에는 CUDA 12.9가 있음. `ldd`로 불일치가 확인됨. `https://wheels.vllm.ai/nightly/cu129`의 nightly 휠이 cu13 휠이 실용화되기 전까지의 유일한 성공 케이스임. 필수 환경변수: `TORCH_CUDA_ARCH_LIST=12.0`, `CUDA_ARCHITECTURES=120`, `CUDA_HOME=/usr/local/cuda-12.9`. [ADR-002](docs/adr/002-vllm-nightly-cu129.md)
 
-3. **`num_speculative_tokens=5`, 모델 카드 권장값 4가 아님.** 측정 결과: MTP=4는 95–98 tok/s, MTP=5는 103.2 tok/s. 5% 개선이 공짜로 들어온다. vLLM의 >1 경고는 일반적인 안내일 뿐 이 하드웨어/드래프트 조합에 특화된 것이 아니다. 초기 5회 측정의 acceptance rate는 78%였고, 2026-05-23 실 트래픽 재측정에서는 sustained 94–97%. [ADR-003](docs/adr/003-mtp-num-spec-tokens-5.md) 참고.
+3. **`num_speculative_tokens=5`, 모델 카드 권장값 4가 아님.** 측정 결과: MTP=4는 95–98 tok/s, MTP=5는 103.2 tok/s. 5% 개선이 늘어남. vLLM의 >1 경고는 일반적인 안내일 뿐 이 하드웨어/드래프트 조합에 특화된 것이 아닌 것으로 추정. 초기 5회 측정의 acceptance rate는 78%였고, 2026-05-23 실 트래픽 재측정에서는 sustained 94–97%. [ADR-003](docs/adr/003-mtp-num-spec-tokens-5.md)
 
-4. **`BCCard/gemma-4-31B-it-FP8-Dynamic`, `nvidia/Gemma-4-31B-IT-NVFP4` 아님.** 초기 배포에서는 llmcompressor FP8 garbage-output 버그 (vLLM Issue #39407) 때문에 NVFP4를 골랐다. 이 버그는 vLLM nightly ≥ 0.20.2rc1에서 FP8-Dynamic에 한해 패치되었다. 한국어 피보나치 프롬프트로 깨끗한 출력 확인, GSM8K Platinum 0.977 (NVFP4는 약 0.94). 가중치는 17 GB → 33 GB로 늘었지만 served-model-name은 동일하게 유지. [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md) 참고.
+4. **`BCCard/gemma-4-31B-it-FP8-Dynamic`, `nvidia/Gemma-4-31B-IT-NVFP4` 아님.** 초기 배포에서는 llmcompressor FP8 garbage-output 버그 (vLLM Issue #39407) 때문에 NVFP4를 골랐었음. 이 버그는 vLLM nightly ≥ 0.20.2rc1에서 FP8-Dynamic에 한해 패치된 것으로 추정(확인 필요). 한국어 피보나치 프롬프트로 깨끗한 출력 확인, GSM8K Platinum 0.977 (NVFP4는 약 0.94). 가중치는 17 GB → 33 GB로 늘었지만 served-model-name은 동일하게 유지됨. [ADR-004](docs/adr/004-bccard-fp8-over-nvfp4.md)
 
-5. **자체 제작한 FastAPI 프록시, 별도 venv.** LiteLLM/Langfuse/Helicone 모두 ~10명 규모 배포가 필요로 하는 것 이상을 끌어오고 요청 로그 스키마를 가린다. 약 300줄, 자체 로그 스키마 소유, 수 초 안에 부팅, 약 400 MB RAM, torch 없음. `.venv-proxy`에 들어가 있으므로 vLLM 의존성 변경이 프록시를 깨뜨릴 수 없다. 코드는 [별도 레포](https://github.com/H4RUming/gemma4-vllm-proxy)에서 버전 관리하며, 이 레포에는 인터페이스 명세인 [proxy/README.md](proxy/README.md)만 둔다. [ADR-005](docs/adr/005-logging-proxy-separation.md) 참고.
+5. **자체 제작한 FastAPI 프록시, 별도 venv.** LiteLLM/Langfuse/Helicone 모두 ~10명 규모 배포가 필요로 하는 것 이상을 끌어오고 요청 로그 스키마를 가림. 약 300줄, 자체 로그 스키마 소유, 수 초 안에 부팅, 약 400 MB RAM, torch 없음. `.venv-proxy`에 들어가 있으므로 vLLM 의존성 변경이 프록시를 깨뜨릴 수 없음. 코드는 [별도 레포](https://github.com/H4RUming/gemma4-vllm-proxy)에서 버전 관리하며, 이 레포에는 인터페이스 명세인 [proxy/README.md](proxy/README.md)만 기록함. [ADR-005](docs/adr/005-logging-proxy-separation.md)
 
-6. **venv 3개 (`.venv`, `.venv-proxy`, `.venv-quant`).** `llmcompressor`는 오래된 torch/transformers를 강하게 핀하기 때문에 `.venv`에 설치하면 서빙 환경을 조용히 다운그레이드시킨다 — 처음 당했을 때 복구에 약 90분 걸렸다. 역할별 venv 분리는 이 전체 부류의 실패를 차단한다. [ADR-006](docs/adr/006-llmcompressor-venv-isolation.md) 참고.
+6. **venv 3개 (`.venv`, `.venv-proxy`, `.venv-quant`).** `llmcompressor`는 오래된 torch/transformers를 강하게 핀하기 때문에 `.venv`에 설치하면 서빙 환경을 조용히 다운그레이드시킴. 역할별 venv 분리를 통해 이 전체 부류의 실패를 차단. [ADR-006](docs/adr/006-llmcompressor-venv-isolation.md)
 
-7. **`--max-num-batched-tokens 32768` (명시적 prefill chunk).** 스텝당 토큰 예산을 묶어서 prefill 버스트 시 activation memory를 예측 가능하게 만든다. 대가로 KV 풀이 약 14% 줄어든다 (576,912 → 495,400 토큰). 풀 크기는 이제 고정된 약속이 아니라 측정값으로 다룬다. [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md) 참고.
+7. **`--max-num-batched-tokens 32768` (명시적 prefill chunk).** 스텝당 토큰 예산을 묶어서 prefill 버스트 시 activation memory를 예측 가능하게 함. 대가로 KV 풀이 약 14% 줄어듦 (576,912 → 495,400 토큰). 풀 크기는 고정된 약속이 아니라 측정값으로 다루기로 함. [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md)
 
 ---
 
 ## 배포 레이아웃 (운영 호스트)
 
-위의 저장소 트리는 리뷰 가시성을 위한 organize된 형태다. 운영 호스트의 워킹 트리는 **flat**이다 — systemd unit 파일, wrapper 스크립트, proxy clone 모두 `${LLM_OPS_DIR}` (기본값 `/home/haru/Desktop/LLM-OPS`) 최상위에 둔다. 각 `*.service` unit의 `WorkingDirectory`로 선언된 경로이고, `ExecStart=/home/haru/Desktop/LLM-OPS/run_vllm.sh`가 거기서 resolve되기 때문이다.
+위의 저장소 트리는 리뷰 가시성을 위한 organize된 형태임. 운영 호스트의 워킹 트리는 **flat**임. systemd unit 파일, wrapper 스크립트, proxy clone 모두 `${LLM_OPS_DIR}` (기본값 `/home/haru/Desktop/LLM-OPS`) 최상위에 위치. 각 `*.service` unit의 `WorkingDirectory`로 선언된 경로이고, `ExecStart=/home/haru/Desktop/LLM-OPS/run_vllm.sh`가 거기서 resolve됨.
 
 ```
 /home/haru/Desktop/LLM-OPS/        (= 두 .service unit의 WorkingDirectory)
@@ -197,25 +198,25 @@ sudo systemctl enable --now vllm-gemma4.service vllm-proxy.service
 └── .venv-quant/                   (llmcompressor; .venv에 절대 설치 안 함)
 ```
 
-`docs/deployment.md §9`의 배포 단계는 이 레포의 `systemd/run_vllm.sh`와 `systemd/run_proxy.sh`를 `${LLM_OPS_DIR}/`로, `.service` 파일을 `/etc/systemd/system/`으로 복사한다. flat 레이아웃은 의도적이다 — unit에 박힌 절대 경로와 그대로 맞아서 `daemon-reload → restart`가 self-contained가 된다.
+`docs/deployment.md §9`의 배포 단계는 이 레포의 `systemd/run_vllm.sh`와 `systemd/run_proxy.sh`를 `${LLM_OPS_DIR}/`로, `.service` 파일을 `/etc/systemd/system/`으로 복사함. flat 레이아웃은 의도적으로 사용함. unit에 박힌 절대 경로와 그대로 맞아서 `daemon-reload → restart`가 self-contained가 됨.
 
 ---
 
 ## 운영 노트
 
-- **헬스 / 재시작**: `systemctl status vllm-gemma4 vllm-proxy`. `sudo systemctl restart vllm-gemma4`는 `Requires=` 덕분에 프록시로 연쇄된다.
+- **헬스 / 재시작**: `systemctl status vllm-gemma4 vllm-proxy`. `sudo systemctl restart vllm-gemma4`는 `Requires=` 덕분에 프록시로 연쇄됨.
 - **로그**: 서빙은 `journalctl -u vllm-gemma4 -f`. 요청 단위 JSONL은 `~/Desktop/LLM-OPS/logs/requests-YYYY-MM-DD.jsonl`.
-- **외부 포트**: 클라이언트는 `0.0.0.0:8000`의 프록시를 친다. vLLM은 `127.0.0.1:8001`에만 바인딩되며 외부에 직접 노출되지 않는다.
-- **served-model-name**: `gemma-4-31b-it` — NVFP4 → FP8-Dynamic 마이그레이션 동안에도 동일하게 유지해서 클라이언트 변경이 필요 없었다.
-- **첫 기동**: `TimeoutStartSec=600`. 모델이나 vLLM 버전을 바꾼 직후 첫 기동에는 FlashInfer JIT 컴파일 + CUDA graph capture에 3~5분이 걸리기 때문이다.
+- **외부 포트**: 클라이언트는 `0.0.0.0:8000`의 프록시를 가짐. vLLM은 `127.0.0.1:8001`에만 바인딩되며 외부에 직접 노출되지 않음.
+- **served-model-name**: `gemma-4-31b-it` — NVFP4 → FP8-Dynamic 마이그레이션 동안에도 동일하게 유지해서 클라이언트 변경이 필요 없었음.
+- **첫 기동**: `TimeoutStartSec=600`. 모델이나 vLLM 버전을 바꾼 직후 첫 기동에는 FlashInfer JIT 컴파일 + CUDA graph capture에 3~5분이 걸릴 수 있기 때문.
 
 ---
 
 ## 트러블슈팅 기록
 
-날짜별 트러블슈팅 노트는 [`docs/investigations/`](docs/investigations/)에 둔다. 특정 사건의 진단 경로 — 관찰된 현상, 배제된 가설, 적용한 변경 — 를 그대로 기록하는 자리이며, 결정을 기록하는 ADR이나 측정을 기록하는 benchmarks와는 역할이 다르다.
+날짜별 트러블슈팅 노트는 [`docs/investigations/`](docs/investigations/)에 기록. 특정 사건의 진단 경로 (관찰된 현상, 배제된 가설, 적용한 변경) 를 그대로 기록하는 자리이며, 결정을 기록하는 ADR이나 측정을 기록하는 benchmarks와는 역할이 다르기에 분리함.
 
-- [2026-05-23 — prefill 성능 조사](docs/investigations/2026-05-23-prefill-investigation.md). 2026-05-20 부근에 p50 입력 토큰이 11배(약 37K) 증가하면서 발생한 TPS 저하 (~90 → ~25 tok/s)의 원인을 추적한다. 병목이 prefill에 있음을 확인하고 [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md)에 기록된 `--max-num-batched-tokens 32768` 설정을 고정했으며, 다음으로 가장 큰 개선 여지는 클라이언트 측 캐시 키 안정화임을 정리한다.
+- [2026-05-23 — prefill 성능 조사](docs/investigations/2026-05-23-prefill-investigation.md). 2026-05-20 부근에 p50 입력 토큰이 11배(약 37K) 증가하면서 발생한 TPS 저하 (~90 → ~25 tok/s)의 원인을 추적한다. 병목이 prefill에 있음을 확인하고 [ADR-007](docs/adr/007-max-num-batched-tokens-32768.md)에 기록된 `--max-num-batched-tokens 32768` 설정을 고정했으며, 다음으로 가장 큰 개선 여지는 클라이언트 측 캐시 키 안정화임을 정리함.
 
 ---
 
@@ -227,4 +228,4 @@ sudo systemctl enable --now vllm-gemma4.service vllm-proxy.service
 
 ## Notes
 
-이 페이지의 내용 정리에 AI 도구를 사용했다.
+이 페이지의 내용 정리에 AI 도구를 사용했다. (주로 Markdown 표 구축 및 다이어그램 작성과 링크에 사용)
